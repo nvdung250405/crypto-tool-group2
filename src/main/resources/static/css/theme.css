@@ -37242,13 +37242,12 @@ text {
 .transcript-container { 
     background-color: #f8fafc;
     background-image: linear-gradient(var(--border-color) 1px, transparent 1px);
-    background-size: 100% 1.8rem;
+    background-size: 100% 1.5rem;
     border: 1px solid var(--border-color); 
     border-radius: 8px; 
     font-family: 'JetBrains Mono', 'Fira Code', monospace; 
-    font-size: 1rem; 
-    line-height: 1.8rem; 
-    white-space: pre-wrap; 
+    font-size: 0.95rem; 
+    line-height: 1.5rem; 
     padding: 0.5rem 1.5rem; 
     max-height: 700px; 
     overflow-y: auto; 
@@ -37275,9 +37274,10 @@ text {
 .transcript-container div {
     margin: 0 !important;
     padding: 0 0 0 1.5rem !important;
-    min-height: 1.8rem;
+    min-height: 1.5rem;
     position: relative;
     z-index: 1;
+    white-space: pre-wrap;
 }
 
 .btn-primary-custom { background-color: var(--primary-color); border-color: var(--primary-color); color: #fff; font-weight: 600; border-radius: 8px; padding: 10px 20px; transition: all 0.2s; }

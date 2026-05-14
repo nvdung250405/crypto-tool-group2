@@ -98,6 +98,10 @@ public class ModuloMathService {
                 response.setErrorMessage("Lỗi: n=" + n + " phải là số nguyên tố để áp dụng định lý Fermat nhỏ.");
                 return response;
             }
+            if (!a.gcd(n).equals(BigInteger.ONE)) {
+                 response.setErrorMessage("Lỗi: gcd(a, n) = " + a.gcd(n) + " ≠ 1. Điều kiện áp dụng Fermat nhỏ là a và n phải nguyên tố cùng nhau.");
+                 return response;
+            }
             if (n.compareTo(BigInteger.ONE) <= 0) {
                 response.setErrorMessage("Lỗi: n (mô-đun) phải lớn hơn 1.");
                 return response;
@@ -105,10 +109,15 @@ public class ModuloMathService {
 
             BigInteger nMinus1 = n.subtract(BigInteger.ONE);
             BigInteger reducedExp = m.remainder(nMinus1);
-            transcript.add("1. n=" + n + " là số nguyên tố => a^(n-1) ≡ 1 (mod n)");
-            transcript.add("2. m' = m mod (n-1) = " + m + " mod " + nMinus1 + " = " + reducedExp);
+            transcript.add("1. Kiểm tra điều kiện & Cơ sở lý thuyết:");
+            transcript.add("Để áp dụng Định lý Fermat nhỏ, điều kiện bắt buộc là module n phải là số nguyên tố và a không chia hết cho n (tức gcd(a, n) = 1).");
+            transcript.add("Ta có n = " + n + " là số nguyên tố và gcd(" + a + ", " + n + ") = 1 (thỏa mãn điều kiện).");
+            transcript.add("Vậy ta có: " + a + "^" + nMinus1 + " ≡ 1 (mod " + n + ").");
+            transcript.add("");
+            transcript.add("2. Quá trình tính toán:");
+            transcript.add("m' = m mod (n-1) = " + m + " mod " + nMinus1 + " = " + reducedExp);
             BigInteger res = a.modPow(reducedExp, n);
-            transcript.add("3. " + a + "^" + reducedExp + " mod " + n + " = " + res);
+            transcript.add("Kết quả: " + a + "^" + reducedExp + " mod " + n + " = " + res);
             response.setResult(res.toString());
             response.setTranscript(transcript);
         } catch (Exception e) {
@@ -137,13 +146,18 @@ public class ModuloMathService {
 
             BigInteger phi = getPhi(n);
             transcript.add("ỨNG DỤNG ĐỊNH LÝ EULER: Tính " + a + "^" + m + " mod " + n);
-            transcript.add("1. Tính Φ(" + n + ") = " + phi);
+            transcript.add("1. Kiểm tra điều kiện & Cơ sở lý thuyết:");
+            transcript.add("Định lý Euler là dạng tổng quát của Fermat nhỏ. Điều kiện để áp dụng là cơ số a và module n phải nguyên tố cùng nhau.");
             if (a.gcd(n).equals(BigInteger.ONE)) {
+                transcript.add("Ta có gcd(a, n) = gcd(" + a + ", " + n + ") = 1 (thỏa mãn điều kiện).");
+                transcript.add("Vậy ta có: " + a + "^Φ(" + n + ") ≡ 1 (mod " + n + ").");
+                transcript.add("");
+                transcript.add("2. Quá trình tính toán:");
+                transcript.add("Tính Φ(" + n + ") = " + phi);
                 BigInteger mPrime = m.remainder(phi);
                 BigInteger res = a.modPow(mPrime, n);
-                transcript.add("2. Vì gcd(" + a + "," + n + ")=1 nên a^Φ(n) ≡ 1 (mod n)");
-                transcript.add("3. m' = " + m + " mod " + phi + " = " + mPrime);
-                transcript.add("4. Kết quả: " + a + "^" + mPrime + " mod " + n + " = " + res);
+                transcript.add("m' = " + m + " mod Φ(n) = " + m + " mod " + phi + " = " + mPrime);
+                transcript.add("Kết quả: " + a + "^" + mPrime + " mod " + n + " = " + res);
                 response.setResult(res.toString());
             } else {
                 transcript.add("Lưu ý: gcd(" + a + "," + n + ") != 1. Không áp dụng trực tiếp Euler.");
@@ -180,6 +194,10 @@ public class ModuloMathService {
             } else {
                 if ("BRUTE".equalsIgnoreCase(method)) {
                     transcript.add("Phương pháp: Theo định nghĩa (Vét cạn)");
+                    transcript.add("1. Kiểm tra điều kiện:");
+                    transcript.add("gcd(" + a + ", " + n + ") = 1 => Tồn tại nghịch đảo x = a^-1 (mod n).");
+                    transcript.add("");
+                    transcript.add("2. Quá trình tính toán:");
                     transcript.add("Tìm x sao cho (" + a + " * x) mod " + n + " = 1");
                     for (long x = 1; x < n.longValue(); x++) {
                         BigInteger val = a.multiply(BigInteger.valueOf(x)).mod(n);
@@ -192,27 +210,36 @@ public class ModuloMathService {
                     }
                 } else {
                     transcript.add("Phương pháp: Thuật toán Euclid mở rộng");
+                    transcript.add("1. Kiểm tra điều kiện & Cơ sở lý thuyết:");
+                    transcript.add("Để phần tử a có nghịch đảo theo modulo n, điều kiện bắt buộc là ước chung lớn nhất của chúng phải bằng 1.");
+                    transcript.add("Ta thấy gcd(a, n) = gcd(" + a + ", " + n + ") = 1. Do đó, tồn tại nghịch đảo x = a^-1 (mod n). Áp dụng thuật toán Euclid mở rộng...");
+                    transcript.add("");
+                    transcript.add("2. Quá trình tính toán:");
                     transcript.add("Lập bảng tìm x sao cho ax + ny = 1 (mod n)");
-                    transcript.add(String.format("%-5s | %-5s | %-5s | %-5s | %-5s | %-5s", "q", "r", "m", "n", "x1", "x2"));
-                    transcript.add("------------------------------------------------------------");
+                    transcript.add(String.format("%-7s | %-7s | %-10s | %-10s", "q", "r", "x", "y"));
+                    transcript.add("--------------------------------------------");
                     
                     BigInteger r1 = n, r2 = a;
                     BigInteger x1 = BigInteger.ZERO, x2 = BigInteger.ONE;
+                    BigInteger y1 = BigInteger.ONE, y2 = BigInteger.ZERO;
                     
-                    transcript.add(String.format("%-5s | %-5s | %-5s | %-5s | %-5s | %-5s", "-", r1, "-", "-", x1, "-"));
-                    transcript.add(String.format("%-5s | %-5s | %-5s | %-5s | %-5s | %-5s", "-", r2, "-", "-", x2, "-"));
+                    transcript.add(String.format("%-7s | %-7s | %-10s | %-10s", "-", r1, x1, y1));
+                    transcript.add(String.format("%-7s | %-7s | %-10s | %-10s", "-", r2, x2, y2));
 
                     while (r2.compareTo(BigInteger.ZERO) > 0) {
                         BigInteger q = r1.divide(r2);
                         BigInteger r = r1.remainder(r2);
                         BigInteger x = x1.subtract(q.multiply(x2));
+                        BigInteger y = y1.subtract(q.multiply(y2));
                         
-                        transcript.add(String.format("%-5s | %-5s | %-5s | %-5s | %-5s | %-5s", q, r, r1, r2, x, "-"));
+                        transcript.add(String.format("%-7s | %-7s | %-10s | %-10s", q, r, x, y));
                         
                         r1 = r2;
                         r2 = r;
                         x1 = x2;
                         x2 = x;
+                        y1 = y2;
+                        y2 = y;
                     }
                     
                     BigInteger inv = x1.remainder(n);
@@ -294,7 +321,12 @@ public class ModuloMathService {
             // For simplicity, we assume the user knows the factors for now or we could factor (but only for small n)
             // Report shows n factors. Let's try to factor n.
             List<BigInteger> m = getPrimeFactors(n);
-            transcript.add("1. Phân tích n = " + n + " thành các thừa số: " + m);
+            transcript.add("1. Kiểm tra điều kiện & Cơ sở lý thuyết:");
+            transcript.add("Để tính lũy thừa bằng CRT, ta phân tích n = " + n + " thành các thừa số nguyên tố cùng nhau: " + m);
+            transcript.add("Điều kiện bắt buộc là các module thành phần phải nguyên tố cùng nhau từng đôi một (pairwise coprime).");
+            transcript.add("Các thừa số " + m + " thỏa mãn điều kiện. Áp dụng định lý CRT...");
+            transcript.add("");
+            transcript.add("2. Quá trình tính toán:");
             
             BigInteger[] a_i = new BigInteger[m.size()];
             for (int i = 0; i < m.size(); i++) {
@@ -323,14 +355,35 @@ public class ModuloMathService {
             
             transcript.add("GIẢI HỆ PHƯƠNG TRÌNH ĐỊNH LÝ SỐ DƯ TRUNG HOA (CRT)");
             BigInteger M = BigInteger.ONE;
+            StringBuilder mStrList = new StringBuilder();
+            boolean pairwiseCoprime = true;
             for (int i = 0; i < pairs.length; i++) {
                 String[] parts = pairs[i].split(",");
                 a[i] = new BigInteger(parts[0].trim());
                 m[i] = new BigInteger(parts[1].trim());
                 M = M.multiply(m[i]);
+                mStrList.append(m[i]).append(i == pairs.length - 1 ? "" : ", ");
                 transcript.add(String.format("   PT%d: x ≡ %s (mod %s)", i+1, a[i], m[i]));
             }
-            transcript.add("1. Tính M = m1*m2*...*mk = " + M);
+            
+            for (int i = 0; i < m.length; i++) {
+                for (int j = i + 1; j < m.length; j++) {
+                    if (!m[i].gcd(m[j]).equals(BigInteger.ONE)) pairwiseCoprime = false;
+                }
+            }
+            
+            transcript.add("");
+            transcript.add("1. Kiểm tra điều kiện & Cơ sở lý thuyết:");
+            transcript.add("Để hệ phương trình modulo có nghiệm duy nhất theo Định lý Số dư Trung Hoa, điều kiện bắt buộc là các module m_1, m_2, ... phải nguyên tố cùng nhau từng đôi một (pairwise coprime).");
+            if (pairwiseCoprime) {
+                transcript.add("Xét các module " + mStrList.toString() + ", ta thấy gcd(m_i, m_j) = 1 (thỏa mãn điều kiện). Áp dụng định lý CRT...");
+            } else {
+                 response.setErrorMessage("Lỗi: Các module không nguyên tố cùng nhau từng đôi một. Không thể áp dụng trực tiếp CRT.");
+                 return response;
+            }
+            transcript.add("");
+            transcript.add("2. Quá trình tính toán:");
+            transcript.add("Tính M = m1*m2*...*mk = " + M);
             
             BigInteger result = BigInteger.ZERO;
             transcript.add(String.format("%-5s | %-15s | %-15s | %-15s", "i", "Mi = M/mi", "yi = Mi^-1 mod mi", "Mi*yi*ai"));
