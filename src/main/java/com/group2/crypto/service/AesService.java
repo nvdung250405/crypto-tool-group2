@@ -224,16 +224,21 @@ public class AesService {
                 byte[][] tempState = new byte[4][4];
                 for (int c = 0; c < 4; c++) {
                     byte b0 = state[0][c], b1 = state[1][c], b2 = state[2][c], b3 = state[3][c];
-                    tempState[0][c] = (byte) (gm(2, b0) ^ gm(3, b1) ^ b2 ^ b3);
-                    tempState[1][c] = (byte) (b0 ^ gm(2, b1) ^ gm(3, b2) ^ b3);
-                    tempState[2][c] = (byte) (b0 ^ b1 ^ gm(2, b2) ^ gm(3, b3));
-                    tempState[3][c] = (byte) (gm(3, b0) ^ b1 ^ b2 ^ gm(2, b3));
+                    int p00 = gm(2, b0)&0xFF, p01 = gm(3, b1)&0xFF, p02 = b2&0xFF, p03 = b3&0xFF;
+                    int p10 = b0&0xFF, p11 = gm(2, b1)&0xFF, p12 = gm(3, b2)&0xFF, p13 = b3&0xFF;
+                    int p20 = b0&0xFF, p21 = b1&0xFF, p22 = gm(2, b2)&0xFF, p23 = gm(3, b3)&0xFF;
+                    int p30 = gm(3, b0)&0xFF, p31 = b1&0xFF, p32 = b2&0xFF, p33 = gm(2, b3)&0xFF;
+
+                    tempState[0][c] = (byte) (p00 ^ p01 ^ p02 ^ p03);
+                    tempState[1][c] = (byte) (p10 ^ p11 ^ p12 ^ p13);
+                    tempState[2][c] = (byte) (p20 ^ p21 ^ p22 ^ p23);
+                    tempState[3][c] = (byte) (p30 ^ p31 ^ p32 ^ p33);
                     
                     transcript.add(String.format("   Cột %d:", c + 1));
-                    transcript.add(String.format("     s'0 = 02*%02X ⊕ 03*%02X ⊕ 01*%02X ⊕ 01*%02X = %02X", b0&0xFF, b1&0xFF, b2&0xFF, b3&0xFF, tempState[0][c]&0xFF));
-                    transcript.add(String.format("     s'1 = 01*%02X ⊕ 02*%02X ⊕ 03*%02X ⊕ 01*%02X = %02X", b0&0xFF, b1&0xFF, b2&0xFF, b3&0xFF, tempState[1][c]&0xFF));
-                    transcript.add(String.format("     s'2 = 01*%02X ⊕ 01*%02X ⊕ 02*%02X ⊕ 03*%02X = %02X", b0&0xFF, b1&0xFF, b2&0xFF, b3&0xFF, tempState[2][c]&0xFF));
-                    transcript.add(String.format("     s'3 = 03*%02X ⊕ 01*%02X ⊕ 01*%02X ⊕ 02*%02X = %02X", b0&0xFF, b1&0xFF, b2&0xFF, b3&0xFF, tempState[3][c]&0xFF));
+                    transcript.add(String.format("     s'0 = 02*%02X ⊕ 03*%02X ⊕ 01*%02X ⊕ 01*%02X = %02X ⊕ %02X ⊕ %02X ⊕ %02X = %02X", b0&0xFF, b1&0xFF, b2&0xFF, b3&0xFF, p00, p01, p02, p03, tempState[0][c]&0xFF));
+                    transcript.add(String.format("     s'1 = 01*%02X ⊕ 02*%02X ⊕ 03*%02X ⊕ 01*%02X = %02X ⊕ %02X ⊕ %02X ⊕ %02X = %02X", b0&0xFF, b1&0xFF, b2&0xFF, b3&0xFF, p10, p11, p12, p13, tempState[1][c]&0xFF));
+                    transcript.add(String.format("     s'2 = 01*%02X ⊕ 01*%02X ⊕ 02*%02X ⊕ 03*%02X = %02X ⊕ %02X ⊕ %02X ⊕ %02X = %02X", b0&0xFF, b1&0xFF, b2&0xFF, b3&0xFF, p20, p21, p22, p23, tempState[2][c]&0xFF));
+                    transcript.add(String.format("     s'3 = 03*%02X ⊕ 01*%02X ⊕ 01*%02X ⊕ 02*%02X = %02X ⊕ %02X ⊕ %02X ⊕ %02X = %02X", b0&0xFF, b1&0xFF, b2&0xFF, b3&0xFF, p30, p31, p32, p33, tempState[3][c]&0xFF));
                 }
                 
                 for (int c = 0; c < 4; c++) {
