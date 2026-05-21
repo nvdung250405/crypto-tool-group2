@@ -43,6 +43,7 @@ public class ModuloMathService {
             return processEulerPower(request);
         }
         if ("CRT".equals(sub)) return processCRTExp(request);
+        if ("REDUCTION".equals(sub)) return processReductionPower(request);
 
         MathModuloResponse response = new MathModuloResponse();
         List<String> transcript = new ArrayList<>();
@@ -78,6 +79,132 @@ public class ModuloMathService {
                 transcript.add(String.format("%-5d | %-5c | %-15s | %-15s", i, bit, sq, mult));
             }
             response.setResult(f.toString());
+            response.setTranscript(transcript);
+        } catch (Exception e) {
+            response.setErrorMessage("Lỗi tham số: " + e.getMessage());
+        }
+        return response;
+    }
+
+    private MathModuloResponse processReductionPower(MathModuloRequest request) {
+        MathModuloResponse response = new MathModuloResponse();
+        List<String> transcript = new ArrayList<>();
+        try {
+            BigInteger a = new BigInteger(request.getA().trim());
+            BigInteger m = new BigInteger(request.getM().trim());
+            BigInteger n = new BigInteger(request.getN().trim());
+
+            if (n.compareTo(BigInteger.ONE) <= 0) {
+                response.setErrorMessage("Lỗi: n (mô-đun) phải lớn hơn 1.");
+                return response;
+            }
+
+            transcript.add("PHƯƠNG PHÁP HẠ BẬC LŨY THỪA (PHÂN TÍCH SỐ MŨ): Tính " + a + "^" + m + " mod " + n);
+            transcript.add("");
+
+            if (m.compareTo(BigInteger.ZERO) == 0) {
+                transcript.add("1. Số mũ m = 0.");
+                transcript.add("2. Kết quả mặc định: " + a + "^0 mod " + n + " = 1");
+                response.setResult("1");
+                response.setTranscript(transcript);
+                return response;
+            }
+
+            // Step 1: Decompose exponent
+            List<BigInteger> powersOf2 = new ArrayList<>();
+            BigInteger temp = m;
+            BigInteger currentPower = BigInteger.ONE;
+            while (temp.compareTo(BigInteger.ZERO) > 0) {
+                if (temp.testBit(0)) {
+                    powersOf2.add(currentPower);
+                }
+                currentPower = currentPower.shiftLeft(1);
+                temp = temp.shiftRight(1);
+            }
+
+            StringBuilder decompStr = new StringBuilder();
+            StringBuilder binaryDecompStr = new StringBuilder();
+            for (int i = powersOf2.size() - 1; i >= 0; i--) {
+                BigInteger p = powersOf2.get(i);
+                decompStr.append(p);
+                int exp = p.bitLength() - 1;
+                binaryDecompStr.append("2^").append(exp);
+                if (i > 0) {
+                    decompStr.append(" + ");
+                    binaryDecompStr.append(" + ");
+                }
+            }
+
+            transcript.add("1. Phân tích số mũ m = " + m + " thành tổng các lũy thừa của cơ số 2:");
+            if (powersOf2.size() > 1) {
+                transcript.add("   " + m + " = " + decompStr + " = " + binaryDecompStr);
+            } else {
+                transcript.add("   " + m + " = " + decompStr);
+            }
+            transcript.add("");
+
+            // Step 2: Compute powers of 2
+            BigInteger maxPower = powersOf2.get(powersOf2.size() - 1);
+            transcript.add("2. Tính từng " + a + "^x mod " + n + " (với x là các lũy thừa của 2 từ 1 đến " + maxPower + "):");
+
+            List<BigInteger> allSquaringVals = new ArrayList<>();
+            List<BigInteger> allSquaringPowers = new ArrayList<>();
+
+            BigInteger currentVal = a.mod(n);
+            BigInteger currentP = BigInteger.ONE;
+
+            allSquaringVals.add(currentVal);
+            allSquaringPowers.add(currentP);
+
+            transcript.add("   - " + a + "^1 mod " + n + " = " + currentVal);
+
+            while (currentP.compareTo(maxPower) < 0) {
+                BigInteger prevVal = currentVal;
+                currentVal = currentVal.multiply(currentVal).mod(n);
+                BigInteger prevP = currentP;
+                currentP = currentP.shiftLeft(1);
+
+                allSquaringVals.add(currentVal);
+                allSquaringPowers.add(currentP);
+
+                transcript.add("   - " + a + "^" + currentP + " ≡ (" + a + "^" + prevP + ")^2 mod " + n + " ≡ " + prevVal + "^2 mod " + n + " = " + currentVal);
+            }
+            transcript.add("");
+
+            // Step 3: Substitute back
+            transcript.add("3. Thế ngược lại vào tích để tính kết quả:");
+            StringBuilder termNames = new StringBuilder();
+            StringBuilder termVals = new StringBuilder();
+            BigInteger finalResult = BigInteger.ONE;
+            BigInteger product = BigInteger.ONE;
+
+            for (int i = powersOf2.size() - 1; i >= 0; i--) {
+                BigInteger p = powersOf2.get(i);
+                termNames.append(a).append("^").append(p);
+
+                int index = allSquaringPowers.indexOf(p);
+                BigInteger val = allSquaringVals.get(index);
+                termVals.append(val);
+
+                finalResult = finalResult.multiply(val).mod(n);
+                product = product.multiply(val);
+
+                if (i > 0) {
+                    termNames.append(" * ");
+                    termVals.append(" * ");
+                }
+            }
+
+            if (powersOf2.size() > 1) {
+                transcript.add("   " + a + "^" + m + " ≡ " + termNames + " mod " + n);
+                transcript.add("        ≡ " + termVals + " mod " + n);
+                transcript.add("        = " + product + " mod " + n);
+                transcript.add("        = " + finalResult);
+            } else {
+                transcript.add("   " + a + "^" + m + " ≡ " + termVals + " mod " + n + " = " + finalResult);
+            }
+
+            response.setResult(finalResult.toString());
             response.setTranscript(transcript);
         } catch (Exception e) {
             response.setErrorMessage("Lỗi tham số: " + e.getMessage());

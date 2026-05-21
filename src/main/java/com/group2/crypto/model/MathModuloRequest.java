@@ -3,7 +3,7 @@ package com.group2.crypto.model;
 
 public class MathModuloRequest {
     private String operation = "POWER"; 
-    private String subMethod = "BASIC"; // For POWER: BASIC | FERMAT | EULER | CRT
+    private String subMethod = "BASIC"; // For POWER: BASIC | REDUCTION | FERMAT | EULER | CRT
     private String a = "";
     private String m = "";
     private String n = "";

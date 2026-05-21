@@ -43,4 +43,23 @@ public class CryptoLogicTest {
         res = des.process(req);
         assertEquals("0123456789ABCDEF", res.getResult().toUpperCase());
     }
+
+    @Test
+    public void testModuloMathReduction() {
+        ModuloMathService moduloService = new ModuloMathService();
+        MathModuloRequest req = new MathModuloRequest();
+        req.setOperation("POWER");
+        req.setSubMethod("REDUCTION");
+        req.setA("3");
+        req.setM("13");
+        req.setN("7");
+
+        MathModuloResponse res = moduloService.process(req);
+        assertNull(res.getErrorMessage());
+        assertEquals("3", res.getResult());
+        
+        // Assert transcript has binary decomposition and intermediate steps
+        assertNotNull(res.getTranscript());
+        assertTrue(res.getTranscript().stream().anyMatch(line -> line.contains("13 = 8 + 4 + 1")));
+    }
 }
