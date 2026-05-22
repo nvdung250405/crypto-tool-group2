@@ -204,11 +204,19 @@
             } else if (op === 'CRT_SYS') {
                 gs.classList.remove('d-none');
             } else if (op === 'PR') {
+                groupSub.classList.remove('d-none');
                 rAB.classList.remove('d-none');
                 ga.classList.remove('d-none');
                 gn.classList.remove('d-none');
                 la.innerText = "a (Số cần kiểm tra)";
                 ln.innerText = "n (Mô-đun)";
+                if (sub.innerHTML.trim() === "" || sub.dataset.owner !== 'PR') {
+                    sub.innerHTML = `
+                        <option value="STANDARD">Phương pháp ước nguyên tố của Φ(n)</option>
+                        <option value="DIVISORS">Phương pháp tính tất cả các ước của Φ(n)</option>
+                    `;
+                    sub.dataset.owner = 'PR';
+                }
             } else if (op === 'LOG') {
                 rAB.classList.remove('d-none');
                 ga.classList.remove('d-none');

@@ -541,8 +541,8 @@ public class ModuloMathService {
         MathModuloResponse response = new MathModuloResponse();
         List<String> transcript = new ArrayList<>();
         try {
-            BigInteger a = new BigInteger(request.getA());
-            BigInteger n = new BigInteger(request.getN());
+            BigInteger a = new BigInteger(request.getA().trim());
+            BigInteger n = new BigInteger(request.getN().trim());
             
             if (n.compareTo(BigInteger.ONE) <= 0) {
                 response.setErrorMessage("Lỗi: n (mô-đun) phải lớn hơn 1.");
@@ -554,29 +554,83 @@ public class ModuloMathService {
             }
 
             transcript.add("KIỂM TRA CĂN NGUYÊN THỦY: a=" + a + ", n=" + n);
-            
             BigInteger phi = getPhi(n);
             transcript.add("1. Φ(n) = " + phi);
-            List<BigInteger> factors = getPrimeFactors(phi);
-            transcript.add("2. Các ước nguyên tố của Φ(n): " + factors);
-            
-            boolean isPR = true;
-            for (BigInteger p : factors) {
-                BigInteger exp = phi.divide(p);
-                BigInteger res = a.modPow(exp, n);
-                transcript.add(String.format("   %s^(%s/%s) mod %s = %s", a, phi, p, n, res));
-                if (res.equals(BigInteger.ONE)) {
-                    isPR = false;
-                    break;
+
+            if ("DIVISORS".equalsIgnoreCase(request.getSubMethod())) {
+                transcript.add("Phương pháp: Tính tất cả các ước nguyên dương x của Φ(n) và kiểm tra a^x mod n.");
+                List<BigInteger> divisors = new ArrayList<>();
+                for (BigInteger i = BigInteger.ONE; i.multiply(i).compareTo(phi) <= 0; i = i.add(BigInteger.ONE)) {
+                    if (phi.mod(i).equals(BigInteger.ZERO)) {
+                        divisors.add(i);
+                        BigInteger other = phi.divide(i);
+                        if (!other.equals(i)) {
+                            divisors.add(other);
+                        }
+                    }
                 }
-            }
-            
-            if (isPR) {
-                response.setResult("YES");
-                transcript.add("=> " + a + " LÀ căn nguyên thủy của " + n);
+                divisors.sort(null);
+                transcript.add("2. Các ước nguyên dương của Φ(n) = " + phi + " là: " + divisors);
+                transcript.add("");
+                transcript.add(String.format("   %-10s | %-20s", "x (Ước)", "a^x mod n"));
+                transcript.add("   -----------------------------------");
+
+                boolean isPR = true;
+                List<BigInteger> earlyCongruentDivisors = new ArrayList<>();
+                for (BigInteger x : divisors) {
+                    BigInteger res = a.modPow(x, n);
+                    transcript.add(String.format("   %-10d | %s^%s mod %s = %s", x, a, x, n, res));
+                    if (res.equals(BigInteger.ONE)) {
+                        if (x.compareTo(phi) < 0) {
+                            isPR = false;
+                            earlyCongruentDivisors.add(x);
+                        }
+                    }
+                }
+                transcript.add("");
+                BigInteger lastRes = a.modPow(phi, n);
+                if (!lastRes.equals(BigInteger.ONE)) {
+                    isPR = false;
+                    transcript.add("=> Do a^(Φ(n)) mod n = " + lastRes + " ≠ 1, a không thỏa mãn Euler và không phải là căn nguyên thủy.");
+                } else if (!isPR) {
+                    transcript.add("=> Có ước x < Φ(n) (x = " + earlyCongruentDivisors + ") thỏa mãn " + a + "^x ≡ 1 (mod " + n + ").");
+                    transcript.add("   Do đó, bậc của " + a + " mod " + n + " nhỏ hơn Φ(n).");
+                    transcript.add("=> " + a + " KHÔNG PHẢI căn nguyên thủy của " + n);
+                } else {
+                    transcript.add("=> Không có ước x < Φ(n) nào thỏa mãn " + a + "^x ≡ 1 (mod " + n + ") và " + a + "^" + phi + " ≡ 1 (mod " + n + ").");
+                    transcript.add("   Do đó, bậc của " + a + " mod " + n + " đúng bằng Φ(n).");
+                    transcript.add("=> " + a + " LÀ căn nguyên thủy của " + n);
+                }
+
+                if (isPR) {
+                    response.setResult("YES");
+                } else {
+                    response.setResult("NO");
+                }
             } else {
-                response.setResult("NO");
-                transcript.add("=> " + a + " KHÔNG PHẢI căn nguyên thủy.");
+                // STANDARD method (prime factors of phi(n))
+                transcript.add("Phương pháp: Sử dụng các ước nguyên tố của Φ(n).");
+                List<BigInteger> factors = getPrimeFactors(phi);
+                transcript.add("2. Các ước nguyên tố của Φ(n): " + factors);
+                
+                boolean isPR = true;
+                for (BigInteger p : factors) {
+                    BigInteger exp = phi.divide(p);
+                    BigInteger res = a.modPow(exp, n);
+                    transcript.add(String.format("   %s^(%s/%s) mod %s = %s", a, phi, p, n, res));
+                    if (res.equals(BigInteger.ONE)) {
+                        isPR = false;
+                        break;
+                    }
+                }
+                
+                if (isPR) {
+                    response.setResult("YES");
+                    transcript.add("=> " + a + " LÀ căn nguyên thủy của " + n);
+                } else {
+                    response.setResult("NO");
+                    transcript.add("=> " + a + " KHÔNG PHẢI căn nguyên thủy.");
+                }
             }
             response.setTranscript(transcript);
         } catch (Exception e) {

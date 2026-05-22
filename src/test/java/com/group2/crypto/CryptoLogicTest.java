@@ -132,4 +132,39 @@ public class CryptoLogicTest {
         assertTrue(res.getTranscript().stream().anyMatch(line -> line.contains("91251D5CA078")));
         assertTrue(res.getTranscript().stream().anyMatch(line -> line.contains("E7CEA2DF")));
     }
+
+    @Test
+    public void testPrimitiveRootStandard() {
+        ModuloMathService modulo = new ModuloMathService();
+        MathModuloRequest req = new MathModuloRequest();
+        req.setOperation("PR");
+        req.setSubMethod("STANDARD");
+        req.setA("3");
+        req.setN("7");
+
+        MathModuloResponse res = modulo.process(req);
+        assertNull(res.getErrorMessage());
+        assertEquals("YES", res.getResult());
+        assertTrue(res.getTranscript().stream().anyMatch(line -> line.contains("3^(6/2) mod 7 = 6")));
+        assertTrue(res.getTranscript().stream().anyMatch(line -> line.contains("3^(6/3) mod 7 = 2")));
+    }
+
+    @Test
+    public void testPrimitiveRootDivisors() {
+        ModuloMathService modulo = new ModuloMathService();
+        MathModuloRequest req = new MathModuloRequest();
+        req.setOperation("PR");
+        req.setSubMethod("DIVISORS");
+        req.setA("3");
+        req.setN("7");
+
+        MathModuloResponse res = modulo.process(req);
+        assertNull(res.getErrorMessage());
+        assertEquals("YES", res.getResult());
+        
+        assertTrue(res.getTranscript().stream().anyMatch(line -> line.contains("2. Các ước nguyên dương của Φ(n) = 6 là: [1, 2, 3, 6]")));
+        assertTrue(res.getTranscript().stream().anyMatch(line -> line.contains("3^2 mod 7 = 2")));
+        assertTrue(res.getTranscript().stream().anyMatch(line -> line.contains("3^3 mod 7 = 6")));
+        assertTrue(res.getTranscript().stream().anyMatch(line -> line.contains("3^6 mod 7 = 1")));
+    }
 }
