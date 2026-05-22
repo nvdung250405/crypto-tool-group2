@@ -52,6 +52,13 @@ public class AesService {
     };
 
     public AesResponse process(AesRequest request) {
+        if ("EXAM_ROUND_OPS".equalsIgnoreCase(request.getOpType())) {
+            return processExamRoundOps(request);
+        }
+        if ("EXAM_KEY_EXP".equalsIgnoreCase(request.getOpType())) {
+            return processExamKeyExp(request);
+        }
+
         AesResponse response = new AesResponse();
         response.setInputData(request.getData());
         response.setInputKey(request.getKey());
@@ -96,6 +103,230 @@ public class AesService {
             response.setErrorMessage("Lỗi xử lý: " + e.getMessage());
         }
 
+        return response;
+    }
+
+    private void addStateToTranscript(byte[][] state, List<String> transcript) {
+        transcript.add(String.format("     [ %02X  %02X  %02X  %02X ]", state[0][0]&0xFF, state[0][1]&0xFF, state[0][2]&0xFF, state[0][3]&0xFF));
+        transcript.add(String.format("     [ %02X  %02X  %02X  %02X ]", state[1][0]&0xFF, state[1][1]&0xFF, state[1][2]&0xFF, state[1][3]&0xFF));
+        transcript.add(String.format("     [ %02X  %02X  %02X  %02X ]", state[2][0]&0xFF, state[2][1]&0xFF, state[2][2]&0xFF, state[2][3]&0xFF));
+        transcript.add(String.format("     [ %02X  %02X  %02X  %02X ]", state[3][0]&0xFF, state[3][1]&0xFF, state[3][2]&0xFF, state[3][3]&0xFF));
+    }
+
+    private AesResponse processExamRoundOps(AesRequest request) {
+        AesResponse response = new AesResponse();
+        List<String> transcript = new ArrayList<>();
+        try {
+            String cleanData = request.getData().replaceAll("\\s+", "");
+            byte[] data = HexFormat.of().parseHex(cleanData);
+
+            if (data.length != 16) {
+                response.setErrorMessage("Dữ liệu state phải đủ 128-bit (32 ký tự hex).");
+                return response;
+            }
+
+            int round = request.getRoundNum();
+            if (round < 1 || round > 10) {
+                response.setErrorMessage("Vòng lặp phải nằm trong khoảng từ 1 đến 10.");
+                return response;
+            }
+
+            transcript.add("GIẢI ĐỀ THI AES - DẠNG BÀI TẬP VÒNG LẶP");
+            transcript.add("ĐỀ BÀI: Vòng lặp thứ " + round + ", State = " + cleanData.toUpperCase());
+            transcript.add("");
+
+            byte[][] state = bytesToState(data);
+            transcript.add("Bước 1: Chuyển đổi chuỗi hex 128-bit thành ma trận State (4x4, xếp theo cột từ trái qua phải):");
+            transcript.add("   Ma trận State ban đầu:");
+            addStateToTranscript(state, transcript);
+            transcript.add("");
+
+            // 1) SubBytes
+            transcript.add("1) Kết quả phép thế S-box (SubBytes) - ký hiệu state = SubByte(state):");
+            transcript.add("   Thay thế từng byte của ma trận bằng giá trị tương ứng trong bảng S-box:");
+            byte[][] subState = new byte[4][4];
+            for (int c = 0; c < 4; c++) {
+                StringBuilder colSteps = new StringBuilder("   - Cột " + (c + 1) + ": ");
+                for (int r = 0; r < 4; r++) {
+                    byte b = state[r][c];
+                    byte val = SBOX[b & 0xFF];
+                    subState[r][c] = val;
+                    colSteps.append(String.format("SBox(%02X) = %02X; ", b & 0xFF, val & 0xFF));
+                }
+                transcript.add(colSteps.toString());
+            }
+            transcript.add("   Ma trận State sau SubBytes:");
+            addStateToTranscript(subState, transcript);
+            String subStr = stateToHex(subState);
+            transcript.add("   => Kết quả dạng chuỗi (Hex): " + subStr);
+            transcript.add("");
+
+            // 2) ShiftRows
+            transcript.add("2) Kết quả dịch hàng (ShiftRows) - ký hiệu state = ShiftRows(state):");
+            byte[][] shiftState = new byte[4][4];
+            for (int r = 0; r < 4; r++) {
+                String before = String.format("[%02X, %02X, %02X, %02X]", subState[r][0]&0xFF, subState[r][1]&0xFF, subState[r][2]&0xFF, subState[r][3]&0xFF);
+                for (int c = 0; c < 4; c++) {
+                    shiftState[r][c] = subState[r][(c + r) % 4];
+                }
+                String after = String.format("[%02X, %02X, %02X, %02X]", shiftState[r][0]&0xFF, shiftState[r][1]&0xFF, shiftState[r][2]&0xFF, shiftState[r][3]&0xFF);
+                String shiftName = (r == 0) ? "không dịch" : ("dịch trái " + r);
+                transcript.add(String.format("   - Hàng %d (%s): %s -> %s", r, shiftName, before, after));
+            }
+            transcript.add("   Ma trận State sau ShiftRows:");
+            addStateToTranscript(shiftState, transcript);
+            String shiftStr = stateToHex(shiftState);
+            transcript.add("   => Kết quả dạng chuỗi (Hex): " + shiftStr);
+            transcript.add("");
+
+            // 3) MixColumns
+            if (round == 10) {
+                transcript.add("3) Kết quả trộn cột (MixColumns):");
+                transcript.add("   Vì vòng lặp thứ 10 là vòng lặp cuối cùng của AES-128, thuật toán không thực hiện phép trộn cột (MixColumns).");
+                transcript.add("   Do đó, ma trận State sau ShiftRows cũng chính là kết quả cuối cùng của vòng trước khi thực hiện cộng khóa vòng (AddRoundKey).");
+                transcript.add("");
+
+                // Highlight index 4 of shiftState
+                byte byteIdx4 = shiftState[0][1];
+                transcript.add("4) Giá trị byte ở vị trí thứ 4 của state (biết thứ tự byte tính từ trái sang phải, bắt đầu từ chỉ số 0):");
+                transcript.add("   - Vị trí thứ 4 tương ứng với phần tử ở hàng 0, cột 1 của ma trận State sau ShiftRows.");
+                transcript.add(String.format("   - Giá trị tại vị trí này là: %02X", byteIdx4 & 0xFF));
+
+                response.setResult(shiftStr);
+            } else {
+                transcript.add("3) Kết quả trộn cột (MixColumns) - ký hiệu state = MixColumns(state):");
+                transcript.add("   Nhân ma trận State sau ShiftRows với ma trận MDS của AES trong trường Galois GF(2^8).");
+                
+                byte[][] mixState = new byte[4][4];
+                for (int c = 0; c < 4; c++) {
+                    byte b0 = shiftState[0][c], b1 = shiftState[1][c], b2 = shiftState[2][c], b3 = shiftState[3][c];
+                    int p00 = gm(2, b0)&0xFF, p01 = gm(3, b1)&0xFF, p02 = b2&0xFF, p03 = b3&0xFF;
+                    int p10 = b0&0xFF, p11 = gm(2, b1)&0xFF, p12 = gm(3, b2)&0xFF, p13 = b3&0xFF;
+                    int p20 = b0&0xFF, p21 = b1&0xFF, p22 = gm(2, b2)&0xFF, p23 = gm(3, b3)&0xFF;
+                    int p30 = gm(3, b0)&0xFF, p31 = b1&0xFF, p32 = b2&0xFF, p33 = gm(2, b3)&0xFF;
+
+                    mixState[0][c] = (byte) (p00 ^ p01 ^ p02 ^ p03);
+                    mixState[1][c] = (byte) (p10 ^ p11 ^ p12 ^ p13);
+                    mixState[2][c] = (byte) (p20 ^ p21 ^ p22 ^ p23);
+                    mixState[3][c] = (byte) (p30 ^ p31 ^ p32 ^ p33);
+                    
+                    transcript.add(String.format("   - Cột %d:", c + 1));
+                    transcript.add(String.format("     s'0 = 02*%02X ⊕ 03*%02X ⊕ 01*%02X ⊕ 01*%02X = %02X ⊕ %02X ⊕ %02X ⊕ %02X = %02X", b0&0xFF, b1&0xFF, b2&0xFF, b3&0xFF, p00, p01, p02, p03, mixState[0][c]&0xFF));
+                    transcript.add(String.format("     s'1 = 01*%02X ⊕ 02*%02X ⊕ 03*%02X ⊕ 01*%02X = %02X ⊕ %02X ⊕ %02X ⊕ %02X = %02X", b0&0xFF, b1&0xFF, b2&0xFF, b3&0xFF, p10, p11, p12, p13, mixState[1][c]&0xFF));
+                    transcript.add(String.format("     s'2 = 01*%02X ⊕ 01*%02X ⊕ 02*%02X ⊕ 03*%02X = %02X ⊕ %02X ⊕ %02X ⊕ %02X = %02X", b0&0xFF, b1&0xFF, b2&0xFF, b3&0xFF, p20, p21, p22, p23, mixState[2][c]&0xFF));
+                    transcript.add(String.format("     s'3 = 03*%02X ⊕ 01*%02X ⊕ 01*%02X ⊕ 02*%02X = %02X ⊕ %02X ⊕ %02X ⊕ %02X = %02X", b0&0xFF, b1&0xFF, b2&0xFF, b3&0xFF, p30, p31, p32, p33, mixState[3][c]&0xFF));
+                }
+                transcript.add("");
+                transcript.add("   Ma trận State sau MixColumns:");
+                addStateToTranscript(mixState, transcript);
+                String mixStr = stateToHex(mixState);
+                transcript.add("   => Kết quả dạng chuỗi (Hex): " + mixStr);
+                transcript.add("");
+
+                // Highlight index 4
+                byte byteIdx4 = mixState[0][1];
+                transcript.add("4) Giá trị byte ở vị trí thứ 4 của state sau khi MixColumns (biết thứ tự byte tính từ trái sang phải, bắt đầu từ chỉ số 0):");
+                transcript.add("   - Vị trí thứ 4 tương ứng với phần tử ở hàng 0, cột 1 của ma trận State.");
+                transcript.add(String.format("   - Giá trị tại vị trí này là: %02X", byteIdx4 & 0xFF));
+
+                response.setResult(mixStr);
+            }
+
+            response.setTranscript(transcript);
+        } catch (IllegalArgumentException e) {
+            response.setErrorMessage("Lỗi: Định dạng Hex không hợp lệ (chỉ chứa 0-9, A-F).");
+        } catch (Exception e) {
+            response.setErrorMessage("Lỗi xử lý: " + e.getMessage());
+        }
+        return response;
+    }
+
+    private AesResponse processExamKeyExp(AesRequest request) {
+        AesResponse response = new AesResponse();
+        List<String> transcript = new ArrayList<>();
+        try {
+            String cleanKey = request.getKey().replaceAll("\\s+", "");
+            byte[] keyPrev = HexFormat.of().parseHex(cleanKey);
+
+            if (keyPrev.length != 16) {
+                response.setErrorMessage("Khóa vòng trước K_{i-1} phải đủ 128-bit (32 ký tự hex).");
+                return response;
+            }
+
+            int round = request.getRoundNum();
+            if (round < 1 || round > 10) {
+                response.setErrorMessage("Vòng lặp phải nằm trong khoảng từ 1 đến 10.");
+                return response;
+            }
+
+            transcript.add("GIẢI ĐỀ THI AES - DẠNG BÀI TẬP SINH KHÓA CON");
+            transcript.add("ĐỀ BÀI: Vòng lặp thứ " + round + ", Khóa K_{i-1} = " + cleanKey.toUpperCase());
+            transcript.add("");
+
+            int[] w = new int[8];
+            for (int i = 0; i < 4; i++) {
+                w[i] = ((keyPrev[4 * i] & 0xFF) << 24) | ((keyPrev[4 * i + 1] & 0xFF) << 16) | ((keyPrev[4 * i + 2] & 0xFF) << 8)
+                        | (keyPrev[4 * i + 3] & 0xFF);
+            }
+
+            transcript.add("1) Chia khóa K_{i-1} thành 4 word (mỗi word 32 bit):");
+            transcript.add(String.format("   w0 = %08X, w1 = %08X, w2 = %08X, w3 = %08X", w[0], w[1], w[2], w[3]));
+            transcript.add("");
+
+            int temp = w[3];
+            int rw = rotWord(temp);
+            transcript.add("1) Kết quả dịch vòng trái với word cuối w3 (RotWord):");
+            transcript.add(String.format("   r = RotWord(w3) = RotWord(%08X) = %08X", temp, rw));
+            transcript.add("");
+
+            int sw = subWord(rw);
+            transcript.add("2) Kết quả phép thế S-box đối với r (SubWord):");
+            transcript.add(String.format("   s = SubWord(r) = SubWord(%08X) = %08X", rw, sw));
+            transcript.add("   Chi tiết thế từng byte:");
+            transcript.add(String.format("   - SBox(%02X) = %02X", (rw >>> 24) & 0xFF, (sw >>> 24) & 0xFF));
+            transcript.add(String.format("   - SBox(%02X) = %02X", (rw >>> 16) & 0xFF, (sw >>> 16) & 0xFF));
+            transcript.add(String.format("   - SBox(%02X) = %02X", (rw >>> 8) & 0xFF, (sw >>> 8) & 0xFF));
+            transcript.add(String.format("   - SBox(%02X) = %02X", rw & 0xFF, sw & 0xFF));
+            transcript.add("");
+
+            int rconVal = RCON[round - 1];
+            int xrc = sw ^ rconVal;
+            transcript.add("3) Kết quả phép XOR với Rcon[" + round + "]:");
+            transcript.add(String.format("   Hằng số vòng Rcon[%d] = %08X", round, rconVal));
+            transcript.add(String.format("   xrc = s ⊕ Rcon[%d] = %08X ⊕ %08X = %08X", round, sw, rconVal, xrc));
+            transcript.add("");
+
+            w[4] = w[0] ^ xrc;
+            w[5] = w[4] ^ w[1];
+            w[6] = w[5] ^ w[2];
+            w[7] = w[6] ^ w[3];
+
+            transcript.add("4) Kết quả khóa tiếp theo K_" + round + ":");
+            transcript.add("   Tính toán các word tiếp theo:");
+            transcript.add(String.format("   - w4 = w0 ⊕ xrc = %08X ⊕ %08X = %08X", w[0], xrc, w[4]));
+            transcript.add(String.format("   - w5 = w1 ⊕ w4 = %08X ⊕ %08X = %08X", w[1], w[4], w[5]));
+            transcript.add(String.format("   - w6 = w2 ⊕ w5 = %08X ⊕ %08X = %08X", w[2], w[5], w[6]));
+            transcript.add(String.format("   - w7 = w3 ⊕ w6 = %08X ⊕ %08X = %08X", w[3], w[6], w[7]));
+            
+            byte[] keyNext = new byte[16];
+            for (int j = 0; j < 4; j++) {
+                int word = w[4 + j];
+                keyNext[4 * j] = (byte) (word >>> 24);
+                keyNext[4 * j + 1] = (byte) (word >>> 16);
+                keyNext[4 * j + 2] = (byte) (word >>> 8);
+                keyNext[4 * j + 3] = (byte) word;
+            }
+            String keyNextStr = HexFormat.of().formatHex(keyNext).toUpperCase();
+            transcript.add("");
+            transcript.add("   => Khóa con K_" + round + " = " + keyNextStr);
+
+            response.setResult(keyNextStr);
+            response.setTranscript(transcript);
+        } catch (IllegalArgumentException e) {
+            response.setErrorMessage("Lỗi: Định dạng Hex không hợp lệ (chỉ chứa 0-9, A-F).");
+        } catch (Exception e) {
+            response.setErrorMessage("Lỗi xử lý: " + e.getMessage());
+        }
         return response;
     }
 

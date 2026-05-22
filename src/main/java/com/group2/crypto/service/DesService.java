@@ -84,6 +84,10 @@ public class DesService {
     private static final byte[] SHIFTS = { 1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1 };
 
     public DesResponse process(DesRequest request) {
+        if ("EXAM_FEISTEL".equalsIgnoreCase(request.getOpType())) {
+            return processExamFeistel(request);
+        }
+
         DesResponse response = new DesResponse();
         response.setInputData(request.getData());
         response.setInputKey(request.getKey());
@@ -356,4 +360,92 @@ public class DesService {
             30, 22, 14, 6, 61, 53, 45, 37, 29, 21, 13, 5, 60, 52, 44, 36,
             28, 20, 12, 4, 27, 19, 11, 3
     };
+
+    private DesResponse processExamFeistel(DesRequest request) {
+        DesResponse response = new DesResponse();
+        response.setInputData(request.getData());
+        response.setInputKey(request.getKey());
+        response.setMode("encrypt");
+
+        List<String> transcript = new ArrayList<>();
+        try {
+            String cleanData = request.getData().replaceAll("\\s+", "").toUpperCase();
+            String cleanKey = request.getKey().replaceAll("\\s+", "").toUpperCase();
+
+            if (cleanData.length() != 8) {
+                response.setErrorMessage("Nửa phải R_{i-1} phải đủ 32-bit (8 ký tự hex).");
+                return response;
+            }
+            if (cleanKey.length() != 12) {
+                response.setErrorMessage("Khóa vòng K_i phải đủ 48-bit (12 ký tự hex).");
+                return response;
+            }
+
+            String rBin = hexToBinary(cleanData);
+            String kBin = hexToBinary(cleanKey);
+
+            transcript.add("GIẢI BÀI TẬP VÒNG LẶP DES (HÀM FEISTEL)");
+            transcript.add("Thông số đầu vào:");
+            transcript.add(String.format("  - Nửa phải R_{i-1} = %s (Hex) = %s (Binary)", cleanData, rBin));
+            transcript.add(String.format("  - Khóa vòng K_i   = %s (Hex) = %s (Binary)", cleanKey, kBin));
+            transcript.add("");
+
+            // 1) Expansion E
+            String eBin = E(rBin);
+            String eHex = binaryToHex(eBin);
+            transcript.add("1) Kết quả mở rộng nửa phải R_{i-1}, ký hiệu là E:");
+            transcript.add("   Phép mở rộng E biến đổi 32 bit của R_{i-1} thành 48 bit bằng cách nhân bản một số vị trí bit theo bảng chọn E.");
+            transcript.add(String.format("   E = E(R_{i-1}) = %s (Binary)", eBin));
+            transcript.add(String.format("                  = %s (Hex)", eHex));
+            transcript.add("");
+
+            // 2) XOR
+            String aBin = XOR(eBin, kBin);
+            String aHex = binaryToHex(aBin);
+            transcript.add("2) Kết quả phép XOR (E, K_i), ký hiệu là A:");
+            transcript.add("   A = E ⊕ K_i");
+            transcript.add(String.format("   E   = %s (Binary) = %s (Hex)", eBin, eHex));
+            transcript.add(String.format("   K_i = %s (Binary) = %s (Hex)", kBin, cleanKey));
+            transcript.add(String.format("   A   = %s (Binary) = %s (Hex)", aBin, aHex));
+            transcript.add("");
+
+            // 3) S-Box
+            transcript.add("3) Kết quả phép thế S-box(A), ký hiệu là B:");
+            transcript.add("   Chia chuỗi A (48 bit) thành 8 khối con, mỗi khối 6 bit: A = B1.B2.B3.B4.B5.B6.B7.B8");
+            transcript.add("   Với mỗi khối con B_j (6 bit):");
+            transcript.add("     - Bit đầu (bit 0) và bit cuối (bit 5) ghép lại để xác định Hàng (0-3).");
+            transcript.add("     - 4 bit ở giữa (bit 1-4) xác định Cột (0-15).");
+            transcript.add("     - Tra bảng S-box tương ứng S_j để tìm giá trị thay thế (4 bit).");
+            transcript.add("");
+
+            StringBuilder bBinBuilder = new StringBuilder();
+            for (int j = 0; j < 8; j++) {
+                String block = aBin.substring(j * 6, (j + 1) * 6);
+                int row = Integer.parseInt("" + block.charAt(0) + block.charAt(5), 2);
+                int col = Integer.parseInt(block.substring(1, 5), 2);
+                int val = S_BOXES[j][row][col];
+                String outBin = String.format("%4s", Integer.toBinaryString(val)).replace(' ', '0');
+                bBinBuilder.append(outBin);
+                
+                transcript.add(String.format("   - Khối B_%d (bits %d-%d): %s", j + 1, j * 6 + 1, (j + 1) * 6, block));
+                transcript.add(String.format("     + Hàng: %s%s = %d", block.charAt(0), block.charAt(5), row));
+                transcript.add(String.format("     + Cột: %s = %d", block.substring(1, 5), col));
+                transcript.add(String.format("     + Tra bảng S%d: S%d[%d][%d] = %d (Hex: %s, Binary: %s)", j + 1, j + 1, row, col, val, Integer.toHexString(val).toUpperCase(), outBin));
+            }
+            String bBin = bBinBuilder.toString();
+            String bHex = binaryToHex(bBin);
+            transcript.add("");
+            transcript.add("   => Kết quả ghép các khối thế S-box:");
+            transcript.add(String.format("   B = %s (Binary)", bBin));
+            transcript.add(String.format("     = %s (Hex)", bHex));
+
+            response.setResult(bHex);
+            response.setTranscript(transcript);
+        } catch (NumberFormatException e) {
+            response.setErrorMessage("Lỗi: Định dạng Hex không hợp lệ (chỉ chứa 0-9, A-F).");
+        } catch (Exception e) {
+            response.setErrorMessage("Lỗi xử lý: " + e.getMessage());
+        }
+        return response;
+    }
 }

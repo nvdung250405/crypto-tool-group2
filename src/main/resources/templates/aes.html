@@ -51,21 +51,34 @@
 
                             <form th:action="@{/aes}" th:object="${request}" method="post">
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold text-uppercase text-muted">Dữ liệu (Hex - 32
-                                        ký tự)</label>
-                                    <input type="text" class="form-control font-monospace text-uppercase"
-                                        th:field="*{data}" id="inputData" maxlength="32"
-                                        placeholder="00112233445566778899AABBCCDDEEFF" required />
-                                </div>
-                                <div class="mb-4">
-                                    <label class="form-label small fw-bold text-uppercase text-muted">Khóa (Hex - 32 ký
-                                        tự)</label>
-                                    <input type="text" class="form-control font-monospace text-uppercase"
-                                        th:field="*{key}" id="inputKey" maxlength="32"
-                                        placeholder="000102030405060708090A0B0C0D0E0F" required />
+                                    <label class="form-label small fw-bold text-uppercase text-muted">Chức năng</label>
+                                    <select class="form-select" th:field="*{opType}" id="inputOpType" onchange="updateFields()">
+                                        <option value="FULL">Mã hóa / Giải mã toàn bộ</option>
+                                        <option value="EXAM_ROUND_OPS">Giải bài tập Vòng lặp AES</option>
+                                        <option value="EXAM_KEY_EXP">Giải bài tập Sinh khóa con AES</option>
+                                    </select>
                                 </div>
 
-                                <div class="mb-4">
+                                <div class="mb-3" id="groupData">
+                                    <label class="form-label small fw-bold text-uppercase text-muted" id="labelData">Dữ liệu (Hex - 32 ký tự)</label>
+                                    <input type="text" class="form-control font-monospace text-uppercase"
+                                        th:field="*{data}" id="inputData" maxlength="32"
+                                        placeholder="00112233445566778899AABBCCDDEEFF" />
+                                </div>
+
+                                <div class="mb-3" id="groupKey">
+                                    <label class="form-label small fw-bold text-uppercase text-muted" id="labelKey">Khóa (Hex - 32 ký tự)</label>
+                                    <input type="text" class="form-control font-monospace text-uppercase"
+                                        th:field="*{key}" id="inputKey" maxlength="32"
+                                        placeholder="000102030405060708090A0B0C0D0E0F" />
+                                </div>
+
+                                <div class="mb-3 d-none" id="groupRound">
+                                    <label class="form-label small fw-bold text-uppercase text-muted">Vòng lặp thứ (1 - 10)</label>
+                                    <input type="number" class="form-control" th:field="*{roundNum}" id="inputRoundNum" min="1" max="10" />
+                                </div>
+
+                                <div class="mb-4" id="groupMode">
                                     <label class="form-label small fw-bold text-uppercase text-muted">Chế độ</label>
                                     <div class="btn-group w-100">
                                         <input type="radio" class="btn-check" th:field="*{mode}" value="encrypt"
@@ -132,10 +145,51 @@
     </main>
 
     <script>
+        function updateFields() {
+            const opType = document.getElementById('inputOpType').value;
+            const groupData = document.getElementById('groupData');
+            const groupKey = document.getElementById('groupKey');
+            const groupMode = document.getElementById('groupMode');
+            const groupRound = document.getElementById('groupRound');
+
+            const labelData = document.getElementById('labelData');
+            const labelKey = document.getElementById('labelKey');
+
+            if (opType === 'FULL') {
+                groupData.classList.remove('d-none');
+                groupKey.classList.remove('d-none');
+                groupMode.classList.remove('d-none');
+                groupRound.classList.add('d-none');
+                labelData.innerText = "Dữ liệu (Hex - 32 ký tự)";
+                labelKey.innerText = "Khóa (Hex - 32 ký tự)";
+            } else if (opType === 'EXAM_ROUND_OPS') {
+                groupData.classList.remove('d-none');
+                groupKey.classList.add('d-none');
+                groupMode.classList.add('d-none');
+                groupRound.classList.remove('d-none');
+                labelData.innerText = "State input (Hex - 32 ký tự)";
+            } else if (opType === 'EXAM_KEY_EXP') {
+                groupData.classList.add('d-none');
+                groupKey.classList.remove('d-none');
+                groupMode.classList.add('d-none');
+                groupRound.classList.remove('d-none');
+                labelKey.innerText = "Khóa input K_{i-1} (Hex - 32 ký tự)";
+            }
+        }
+
         function useSampleData() {
-            document.getElementById('inputData').value = 'B104AADD3AC293DF787EFD2CF8065925';
-            document.getElementById('inputKey').value = 'C281B1763B140EF7AB12EB2745F1F59F';
-            document.getElementById('mode-enc').checked = true;
+            const opType = document.getElementById('inputOpType').value;
+            if (opType === 'FULL') {
+                document.getElementById('inputData').value = 'B104AADD3AC293DF787EFD2CF8065925';
+                document.getElementById('inputKey').value = 'C281B1763B140EF7AB12EB2745F1F59F';
+                document.getElementById('mode-enc').checked = true;
+            } else if (opType === 'EXAM_ROUND_OPS') {
+                document.getElementById('inputData').value = '589D36EBFDEE387D0FCC9BED4C4046BD';
+                document.getElementById('inputRoundNum').value = '5';
+            } else if (opType === 'EXAM_KEY_EXP') {
+                document.getElementById('inputKey').value = '0F1571C947D9E8590CB7ADD6AF7F6798';
+                document.getElementById('inputRoundNum').value = '3';
+            }
         }
 
         function copyTranscript() {
@@ -146,6 +200,10 @@
                 alert('Đã sao chép các bước thực hiện!');
             }
         }
+
+        window.onload = function() {
+            updateFields();
+        };
     </script>
 </body>
 

@@ -50,21 +50,33 @@
 
                             <form th:action="@{/des}" th:object="${request}" method="post">
                                 <div class="mb-3">
-                                    <label class="form-label small fw-bold text-uppercase text-muted">Dữ liệu (Hex - 16
-                                        ký tự)</label>
+                                    <label class="form-label small fw-bold text-uppercase text-muted">Chức năng</label>
+                                    <select class="form-select" th:field="*{opType}" id="inputOpType" onchange="updateFields()">
+                                        <option value="FULL">Mã hóa / Giải mã toàn bộ</option>
+                                        <option value="EXAM_FEISTEL">Giải bài tập Hàm Feistel DES</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3" id="groupData">
+                                    <label class="form-label small fw-bold text-uppercase text-muted" id="labelData">Dữ liệu (Hex - 16 ký tự)</label>
                                     <input type="text" class="form-control font-monospace text-uppercase"
                                         th:field="*{data}" id="inputData" maxlength="16" placeholder="0123456789ABCDEF"
                                         required />
                                 </div>
-                                <div class="mb-4">
-                                    <label class="form-label small fw-bold text-uppercase text-muted">Khóa (Hex - 16 ký
-                                        tự)</label>
+                                <div class="mb-3" id="groupKey">
+                                    <label class="form-label small fw-bold text-uppercase text-muted" id="labelKey">Khóa (Hex - 16 ký tự)</label>
                                     <input type="text" class="form-control font-monospace text-uppercase"
                                         th:field="*{key}" id="inputKey" maxlength="16" placeholder="133457799BBCDFF1"
                                         required />
                                 </div>
 
-                                <div class="mb-4">
+                                <div class="mb-3 d-none" id="groupRound">
+                                    <label class="form-label small fw-bold text-uppercase text-muted">Vòng lặp thứ (1 - 16)</label>
+                                    <input type="number" class="form-control" th:field="*{roundNum}"
+                                        id="inputRoundNum" min="1" max="16" value="1" required />
+                                </div>
+
+                                <div class="mb-4" id="groupMode">
                                     <label class="form-label small fw-bold text-uppercase text-muted">Chế độ</label>
                                     <div class="btn-group w-100">
                                         <input type="radio" class="btn-check" th:field="*{mode}" value="encrypt"
@@ -131,10 +143,50 @@
     </main>
 
     <script>
+        function updateFields() {
+            const opType = document.getElementById('inputOpType').value;
+            const groupData = document.getElementById('groupData');
+            const groupKey = document.getElementById('groupKey');
+            const groupMode = document.getElementById('groupMode');
+            const groupRound = document.getElementById('groupRound');
+
+            const labelData = document.getElementById('labelData');
+            const labelKey = document.getElementById('labelKey');
+            const inputData = document.getElementById('inputData');
+            const inputKey = document.getElementById('inputKey');
+
+            if (opType === 'FULL') {
+                groupData.classList.remove('d-none');
+                groupKey.classList.remove('d-none');
+                groupMode.classList.remove('d-none');
+                groupRound.classList.add('d-none');
+                inputData.maxLength = 16;
+                inputKey.maxLength = 16;
+                labelData.innerText = "Dữ liệu (Hex - 16 ký tự)";
+                labelKey.innerText = "Khóa (Hex - 16 ký tự)";
+            } else if (opType === 'EXAM_FEISTEL') {
+                groupData.classList.remove('d-none');
+                groupKey.classList.remove('d-none');
+                groupMode.classList.add('d-none');
+                groupRound.classList.remove('d-none');
+                inputData.maxLength = 8;
+                inputKey.maxLength = 12;
+                labelData.innerText = "Nửa phải R_{i-1} (Hex - 8 ký tự)";
+                labelKey.innerText = "Khóa vòng K_i (Hex - 12 ký tự)";
+            }
+        }
+
         function useSampleData() {
-            document.getElementById('inputData').value = 'E36B4C92DE9AD726';
-            document.getElementById('inputKey').value = '17FFCC5ADBF3EA87';
-            document.getElementById('mode-enc').checked = true;
+            const opType = document.getElementById('inputOpType').value;
+            if (opType === 'FULL') {
+                document.getElementById('inputData').value = 'E36B4C92DE9AD726';
+                document.getElementById('inputKey').value = '17FFCC5ADBF3EA87';
+                document.getElementById('mode-enc').checked = true;
+            } else if (opType === 'EXAM_FEISTEL') {
+                document.getElementById('inputData').value = 'C11BFC09';
+                document.getElementById('inputKey').value = '710DEAA3202B';
+                document.getElementById('inputRoundNum').value = '1';
+            }
         }
 
         function copyTranscript() {
@@ -145,6 +197,10 @@
                 alert('Đã sao chép các bước thực hiện!');
             }
         }
+
+        window.onload = function() {
+            updateFields();
+        };
     </script>
 </body>
 
